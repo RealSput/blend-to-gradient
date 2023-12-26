@@ -50,6 +50,7 @@ let obj_to_grad = (str, offset_x = 0, offset_y = 0, add = true, old_pos) => {
 				return gr;
 			}
 			let diff = [x - old_pos[curr_vert][1] + offset_x, y - old_pos[curr_vert][2] + offset_y]
+			ggroups[curr_vert] = [old_pos[curr_vert][0], x, y];
 			old_pos[curr_vert][0].move(...diff);
 			curr_vert++;
 			return old_pos[curr_vert - 1][0];
@@ -163,10 +164,8 @@ let obj_to_grad = (str, offset_x = 0, offset_y = 0, add = true, old_pos) => {
 	let lrs = 8
 	let lre = 11;
 	asf = divideArray(asf, lre - lrs)
-	console.log(asf)
 	let layer = lrs;
 	for (let a of asf) {
-		// console.log(`LAYER ${layer}`)
 		for (let f of a) {
 			tri(...f, layer);
 		}
@@ -179,12 +178,16 @@ let obj_to_grad = (str, offset_x = 0, offset_y = 0, add = true, old_pos) => {
 
 const objs = JSON.parse(fs.readFileSync('frames.json').toString())
 
+// todo: fix diff between vertices calcs
 let a = obj_to_grad(objs[0], 20, -40, false);
 add_all(a);
 let ggr = a.ggroups;
-for (let frame of objs) {
-	wait(0.1);
-	let b = obj_to_grad(frame, 0, 0, false, ggr);
+let b = obj_to_grad(objs[1], 0, 0, false, ggr);
+b.objsf.forEach(x => {$.add(x.obj ? x.obj : x)});
+for (let frame of objs.slice(1)) {
+	wait(0.041);
+	b = obj_to_grad(frame, 0, 0, false, ggr);
 	b.objsf.forEach(x => {$.add(x.obj ? x.obj : x)});
+	ggr = b.ggroups;
 }
 $.exportToSavefile({ info: true })
