@@ -1,4 +1,3 @@
-// warning: spaghetti code lmfao
 require('@g-js-api/g.js');
 
 const fs = require('fs');
@@ -18,9 +17,8 @@ const avr = (...v) => v.reduce((sum, val) => sum + val, 0) / v.length;
 	
 let uc = unknown_c();
 let invis_color = unknown_c();
-let red = unknown_c();
 invis_color.set(rgba(0, 0, 0, 0), 0, true);
-red.set(rgb(255, 0, 0));
+uc.set(rgb(255, 0, 0));
 
 let obj_to_grad = (str, offset_x = 0, offset_y = 0, add = true, old_pos, fid) => {
     let objsf = [];
