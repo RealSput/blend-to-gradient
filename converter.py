@@ -3,19 +3,14 @@ import bpy
 import os
 import pyperclip
 
-# Set the path to store temporary OBJ files
-temp_objs_path = "C:\\Users\\Diego\\Downloads\\temp_objs"
+# Set the path to store temporary OBJ and MTL files
+temp_objs_path = ""
 
-# Create the directory if it doesn't exist
 if not os.path.exists(temp_objs_path):
     os.makedirs(temp_objs_path)
 
-# Function to convert each frame to OBJ and store it temporarily
 def convert_frame_to_obj(frame_number):
-    # Set the output OBJ file path
     obj_path = os.path.join(temp_objs_path, f"frame_{frame_number}.obj")
-
-    # Set the output folder for the OBJ export
     bpy.ops.wm.obj_export(
         filepath=obj_path
     )
@@ -37,7 +32,6 @@ def read_delete_append(obj_path, obj_list):
 def copy_list_to_clipboard(obj_list):
     pyperclip.copy(json.dumps(obj_list))
 
-# Example usage
 frame_start = bpy.context.scene.frame_start
 frame_end = bpy.context.scene.frame_end
 obj_list = []
@@ -54,4 +48,3 @@ final_res.append(obj_list)
 
 # Copy the list to the clipboard
 copy_list_to_clipboard(final_res)
- 
