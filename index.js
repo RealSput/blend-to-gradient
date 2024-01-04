@@ -2,6 +2,7 @@ require('@g-js-api/g.js');
 
 const fs = require('fs');
 const OBJFile = require('obj-file-parser');
+const MTLFile = require('mtl-file-parser');
 const path = require('path');
 
 let dump = [];
@@ -14,44 +15,58 @@ const normalize = (a) => {
 	return { x: a.x / len, y: a.y / len, z: a.z / len };
 };
 const avr = (...v) => v.reduce((sum, val) => sum + val, 0) / v.length;
-	
+
+const stripUnneededStatements = (mtlString, statementsToOmit) => {
+  const regexPatterns = statementsToOmit.map(statement => new RegExp(`^${statement}\\s+[\\d.]+(\\s+[\\d.]+)?(\\s+[\\d.]+)?`, 'gm'));
+
+  let strippedString = mtlString;
+  regexPatterns.forEach(regex => {
+    strippedString = strippedString.replace(regex, '');
+  });
+
+  return strippedString.split(/\r?\n/).filter(line => line.trim() !== '').join('\n');
+};
+
+let default_color = unknown_c();
 let uc = unknown_c();
 let invis_color = unknown_c();
 invis_color.set(rgba(0, 0, 0, 0), 0, true);
-uc.set(rgb(255, 0, 0));
 
-let obj_to_grad = (str, offset_x = 0, offset_y = 0, add = true, old_pos, fid) => {
+let colors_u;
+
+let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_pos, fid) => {
+	material = stripUnneededStatements(material, ['Ns', 'Ke', 'Ni'])
+	
     let objsf = [];
-    const $obj = (new OBJFile(str)).parse().models[0];
+    const $obj = new OBJFile(str).parse().models[0];
+	const $mtl = new MTLFile(material).parse();
     let ggroups = {};
     let curr_vert = 0;
     let ord = -1000;
     let grad_id = 1;
+	if (!colors_u) {
+		colors_u = {}
+		
+		for (let i of $mtl) {
+			let color = [i.Kd.red * 255, i.Kd.green * 255, i.Kd.blue * 255].map(x => Math.floor(x));
+			let cg = unknown_c();
+			cg.set(color);
+			colors_u[i.name] = cg;
+		}
+	}
 
     const vertex = (x, y) => {
-		if (add) {
+		if (add || !old_pos) {
 			const gr = unknown_g();
 			ggroups[curr_vert] = [gr, x, y];
-			$.add({
+			let o = {
 				OBJ_ID: 1764,
 				X: x + offset_x,
 				Y: y + offset_y,
 				GROUPS: [1, gr],
 				COLOR: invis_color
-			})
-			curr_vert++;
-			return gr;
-		}  
-		if (!old_pos) {
-			const gr = unknown_g();
-			ggroups[curr_vert] = [gr, x, y];
-			objsf.push({
-				OBJ_ID: 1764,
-				X: x + offset_x,
-				Y: y + offset_y,
-				GROUPS: [1, gr],
-				COLOR: invis_color
-			})
+			};
+			old_pos ? $.add(o) : objsf.push(o)
 			curr_vert++;
 			return gr;
 		}
@@ -64,7 +79,6 @@ let obj_to_grad = (str, offset_x = 0, offset_y = 0, add = true, old_pos, fid) =>
     };
     const quad = (bl, br, tl, tr, col = 1, bgr = 1, layer) => {
         const hsv = `0a1a${bgr}a0a0`;
-		// gradient trigger
         const o = { OBJ_ID: 2903, Y: 100 + grad_id * 10 * 3, X: fid * 25 * 3, ORD: ord, GR_BL: bl, GR_BR: br, GR_TL: tl, GR_TR: tr, GR_ID: grad_id, COLOR: col, COLOR_2: col, PREVIEW_OPACITY: 1, HVS_ENABLED: true, COLOR_2_HVS_ENABLED: true, HVS: hsv, COLOR_2_HVS: hsv, GR_VERTEX_MODE: true, GR_LAYER: layer };
         add ? $.add(o) : objsf.push(o);
         ord++; grad_id++;
@@ -85,20 +99,21 @@ let obj_to_grad = (str, offset_x = 0, offset_y = 0, add = true, old_pos, fid) =>
 
     let asf = [];
     for (let f of $obj.faces) {
+		const face_color = f.material == '' ? default_color : colors_u[f.material];
         const vs = f.vertices;
         const n1 = $obj.vertexNormals[vs[0].vertexNormalIndex - 1];
         const n2 = $obj.vertexNormals[vs[1].vertexNormalIndex - 1];
         const n3 = $obj.vertexNormals[vs[2].vertexNormalIndex - 1];
         const bgr = calcBgrForNormal(normalize({ x: avr(n1?.x, n2?.x, n3?.x), y: avr(n1?.y, n2?.y, n3?.y), z: avr(n1?.z, n2?.z, n3?.z) }));
-        let arga;
+		let arga;
         let depth;
         if (vs.length == 4) {
             depth = avr($obj.vertices[vs[0].vertexIndex - 1].z, $obj.vertices[vs[1].vertexIndex - 1].z, $obj.vertices[vs[2].vertexIndex - 1].z, $obj.vertices[vs[3].vertexIndex - 1].z);
-            arga = [vertexToGid[vs[3].vertexIndex], vertexToGid[vs[0].vertexIndex], vertexToGid[vs[2].vertexIndex], vertexToGid[vs[1].vertexIndex], uc, bgr, depth];
+            arga = [vertexToGid[vs[3].vertexIndex], vertexToGid[vs[0].vertexIndex], vertexToGid[vs[2].vertexIndex], vertexToGid[vs[1].vertexIndex], face_color, bgr, depth];
         } else {
             arga = [vertexToGid[vs[0].vertexIndex], vertexToGid[vs[1].vertexIndex], vertexToGid[vs[2].vertexIndex]];
             depth = avr($obj.vertices[vs[0].vertexIndex - 1].z, $obj.vertices[vs[1].vertexIndex - 1].z, $obj.vertices[vs[2].vertexIndex - 1].z);
-            arga.push(uc, bgr, depth);
+            arga.push(face_color, bgr, depth);
         }
         asf.push(arga);
     }
@@ -119,20 +134,24 @@ let obj_to_grad = (str, offset_x = 0, offset_y = 0, add = true, old_pos, fid) =>
     return add ? ggroups : { objsf, ggroups };
 };
 
-const objs = JSON.parse(fs.readFileSync('frames.json').toString());
+let objs = JSON.parse(fs.readFileSync('frames.json').toString());
+let materials = objs[0];
+objs = objs[1]
 
 let fid = 0;
-let a = obj_to_grad(objs[0], 20, -40, false, null, fid);
+let a = obj_to_grad(materials, objs[0], 20, -40, false, null, fid);
 add_all(a);
 fid++;
+if (objs.length > 1) {
 let ggr = a.ggroups;
-let b = obj_to_grad(objs[1], 0, 0, false, ggr, fid);
+let b = obj_to_grad(materials, objs[1], 0, 0, false, ggr, fid);
 b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
 for (let frame of objs.slice(1)) {
     fid++;
     wait(0.052);
-    b = obj_to_grad(frame, 0, 0, false, ggr, fid);
+    b = obj_to_grad(materials, frame, 0, 0, false, ggr, fid);
     b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
     ggr = b.ggroups;
+}
 }
 $.exportToSavefile({ info: true });
