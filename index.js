@@ -73,7 +73,7 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
 		let real_diff = [x - old_pos[curr_vert][1], y - old_pos[curr_vert][2]]
 		let diff = [real_diff[0] + offset_x, real_diff[1] + offset_y]
 		ggroups[curr_vert] = [old_pos[curr_vert][0], x, y];
-		old_pos[curr_vert][0].move(...diff);
+		old_pos[curr_vert][0].move(...diff, 0, NONE, 2, 1, 1, false);
 		curr_vert++;
 		return old_pos[curr_vert - 1][0];
     };
@@ -142,16 +142,17 @@ let fid = 0;
 let a = obj_to_grad(materials, objs[0], 20, -40, false, null, fid);
 add_all(a);
 fid++;
+wait(1);
 if (objs.length > 1) {
-let ggr = a.ggroups;
-let b = obj_to_grad(materials, objs[1], 0, 0, false, ggr, fid);
-b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
-for (let frame of objs.slice(1)) {
-    fid++;
-    wait(0.052);
-    b = obj_to_grad(materials, frame, 0, 0, false, ggr, fid);
-    b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
-    ggr = b.ggroups;
-}
+	let ggr = a.ggroups;
+	let b = obj_to_grad(materials, objs[1], 0, 0, false, ggr, fid);
+	b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
+	for (let frame of objs.slice(1)) {
+		fid++;
+		wait(0.052);
+		b = obj_to_grad(materials, frame, 0, 0, false, ggr, fid);
+		b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
+		ggr = b.ggroups;
+	}
 }
 $.exportToSavefile({ info: true });
