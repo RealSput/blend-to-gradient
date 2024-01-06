@@ -41,8 +41,7 @@ let uc = unknown_c();
 let invis_color = unknown_c();
 invis_color.set(rgba(0, 0, 0, 0), 0, true);
 
-let colors_u;
-let frame_delay = fpsToSeconds(24); // 24 fps anim
+let colors_u, frame_delay;
 
 let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_pos, fid) => {
     material = stripUnneededStatements(material, ['Ns', 'Ke', 'Ni'])
@@ -182,7 +181,10 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
 let pos = [-40, -60]; // offset of rendered scene, xy coordinates
 let lock = true; // whether the scene should be locked to player X or not
 let loop = false; // whether animation should loop forever or not
+let fps = 24; // frames per sec
 // configuration end
+
+frame_delay = fpsToSeconds(fps);
 
 if (lock) lock_group.lock_to_player(true, false);
 let objs = JSON.parse(fs.readFileSync('frames.json').toString());
