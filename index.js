@@ -113,19 +113,17 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
         ord++;
         grad_id++;
     };
-    const tri = (v1, v2, v3, col = 1, bgr = 1, layer, col2 = col, addBlend = false) => {
-        quad(v1, v2, v3, v3, col, bgr, layer, col2, addBlend);
-    };
+    const tri = (v1, v2, v3, col = 1, bgr = 1, layer, col2 = col, addBlend = false) => quad(v1, v2, v3, v3, col, bgr, layer, col2, addBlend); 
     const vertexToLight = normalize({
-        x: -0.5,
-        y: 1,
-        z: 0.5
+        x: light_pos[0],
+        y: light_pos[1],
+        z: light_pos[2]
     });
     const calcBgrForNormal = (normal) => Math.min(1, Math.max(0, dot(normal, vertexToLight)));
 
     const centerPos = {
         x: 200,
-        y: 200
+        y: 150
     };
     let vertexToGid = {};
 
@@ -159,9 +157,7 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
 
         let depth = avr($obj.vertices[vs[0].vertexIndex - 1].z, $obj.vertices[vs[1].vertexIndex - 1].z, $obj.vertices[vs[2].vertexIndex - 1].z);
 
-        asf.push({vs: [v3, v1, v2], depth, c1: black_color, c2: face_color, bgr: l1, blending: false});
-        asf.push({vs: [v1, v2, v3], depth, c1: black_color, c2: face_color, bgr: l2, blending: true});
-        asf.push({vs: [v2, v3, v1], depth, c1: black_color, c2: face_color, bgr: l3, blending: true});
+        asf.push({vs: [v3, v1, v2], depth, c1: black_color, c2: face_color, bgr: l1, blending: false}, {vs: [v1, v2, v3], depth, c1: black_color, c2: face_color, bgr: l2, blending: true}, {vs: [v2, v3, v1], depth, c1: black_color, c2: face_color, bgr: l3, blending: true});
     }
 
     asf = asf.sort((a, b) => a.depth - b.depth);
@@ -172,7 +168,7 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
     let layer = lrs;
     for (let a of asf) {
         for (let f of a) {
-            /*f.length == 6 ? quad(...f, layer) :*/ tri(f.vs[0], f.vs[1], f.vs[2], f.c1, f.bgr, layer, f.c2, f.blending);
+            tri(f.vs[0], f.vs[1], f.vs[2], f.c1, f.bgr, layer, f.c2, f.blending);
         }
         layer++;
     }
@@ -184,54 +180,75 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
 };
 
 // configuration start
+let light_pos = [-0.5, 1, 0.5] // position of light (x, y, z)
+let file_path = 'frames.json'; // path of JSON input
 let pos = [-40, -60]; // offset of rendered scene, xy coordinates
-let lock = true; // whether the scene should be locked to player X or not
-let loop = false; // whether animation should loop forever or not
+let lock = false; // whether the scene should be locked to player X or not
+let loop = true; // whether animation should loop forever or not
 let fps = 24; // frames per sec
 // configuration end
 
 frame_delay = fpsToSeconds(fps);
 
-if (lock) lock_group.lock_to_player(true, false);
-let objs = JSON.parse(fs.readFileSync('frames.json').toString());
-let materials = objs[0];
-objs = objs[1]
+let readFile = (filename) => {
+	return new Promise((resolve) => {
+		let output = [];
 
-let fid = 0;
-let a = obj_to_grad(materials, objs[0], ...pos, false, null, fid);
-add_all(a);
-fid++;
-if (objs.length > 1) {
-    wait(1);
-    let ggr = a.ggroups;
-    let b = obj_to_grad(materials, objs[1], 0, 0, false, ggr, fid);
-    b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
-    if (loop) {
-        let ca = counter(0);
-        let trf = trigger_function(() => {
-            for (let frame of objs.slice(1)) {
-                fid++;
-                b = obj_to_grad(materials, frame, 0, 0, false, ggr, fid);
-                b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
-                ggr = b.ggroups;
-                wait(frame_delay)
-            }
-            fid = 0;
-        })
-        while_loop(equal_to(ca, 0), () => {
-            trf.call();
-        }, frame_delay * (objs.length - 1))
-    } else {
-        for (let frame of objs.slice(1)) {
-            fid++;
-            b = obj_to_grad(materials, frame, 0, 0, false, ggr, fid);
-            b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
-            ggr = b.ggroups;
-            wait(frame_delay)
-        }
-        fid = 0;
-    }
+		const readStream = fs.createReadStream(filename);
+
+		readStream.on('data', function(chunk) {
+		  output.push(chunk)
+		});
+
+		readStream.on('end', function() {
+		  resolve(Buffer.concat(output).toString())
+		});
+	})
 }
-$.exportToSavefile({
-    info: true
-});
+
+(async () => {
+	if (lock) lock_group.lock_to_player(true, false);
+	let file = await readFile(file_path);
+	let objs = JSON.parse(file);
+	let materials = objs[0];
+	objs = objs[1]
+
+	let fid = 0;
+	let a = obj_to_grad(materials, objs[0], ...pos, false, null, fid, light_pos);
+	add_all(a);
+	fid++;
+	if (objs.length > 1) {
+		wait(1);
+		let ggr = a.ggroups;
+		let b = obj_to_grad(materials, objs[1], 0, 0, false, ggr, fid, light_pos);
+		b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
+		if (loop) {
+			let ca = counter(0);
+			while_loop(equal_to(ca, 0), () => {
+				for (let frame of objs.slice(1)) {
+					fid++;
+					b = obj_to_grad(materials, frame, 0, 0, false, ggr, fid, light_pos);
+					b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
+					ggr = b.ggroups;
+					wait(frame_delay)
+				}
+				fid = 0;
+				b = obj_to_grad(materials, objs[0], 0, 0, false, ggr, fid, light_pos, false);
+				b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
+				ggr = b.ggroups;
+			})
+		} else {
+			for (let frame of objs.slice(1)) {
+				fid++;
+				b = obj_to_grad(materials, frame, 0, 0, false, ggr, fid, light_pos);
+				b.objsf.forEach(x => $.add(x.obj ? x.obj : x));
+				ggr = b.ggroups;
+				wait(frame_delay)
+			}
+			fid = 0;
+		}
+	}
+	$.exportToSavefile({
+		info: true
+	});
+})();
