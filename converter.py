@@ -4,14 +4,17 @@ import os
 import pyperclip
 
 # Set the path to store temporary OBJ and MTL files
-temp_objs_path = ""
+temp_objs_path = "./frames"
+
+bpy.ops.wm.open_mainfile(filepath="./test.blend")
 
 if not os.path.exists(temp_objs_path): os.makedirs(temp_objs_path)
 
 def convert_frame_to_obj(frame_number):
     obj_path = os.path.join(temp_objs_path, f"frame_{frame_number}.obj")
     bpy.ops.wm.obj_export(
-        filepath=obj_path
+        filepath=obj_path,
+        export_triangulated_mesh=True
     )
     return obj_path
 

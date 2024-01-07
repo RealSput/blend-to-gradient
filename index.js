@@ -35,6 +35,8 @@ const stripUnneededStatements = (mtlString, statementsToOmit) => {
 };
 const fpsToSeconds = fps => (1 / fps).toFixed(4);
 
+let black_color = unknown_c();
+black_color.set([0, 0, 0], 0);
 let lock_group = unknown_g();
 let default_color = unknown_c();
 let uc = unknown_c();
@@ -52,7 +54,7 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
     let ggroups = {};
     let curr_vert = 0;
     let ord = -1000;
-    let grad_id = 1;
+    let grad_id = -10000;
     if (!colors_u) {
         colors_u = {}
 
@@ -86,11 +88,12 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
         curr_vert++;
         return old_pos[curr_vert - 1][0];
     };
-    const quad = (bl, br, tl, tr, col = 1, bgr = 1, layer) => {
-        const hsv = `0a1a${bgr}a0a0`;
+    const quad = (bl, br, tl, tr, col = 1, bgr = 1, layer, col2 = col, addBlend = false) => {
+        // little cheat cuz i didn't want to change G.js
+        const hsv = `0a1a${bgr}a0a0,174,${addBlend ? 1 : 0}`;
         const o = {
             OBJ_ID: 2903,
-            Y: 100 + grad_id * 10 * 3,
+            Y: 100 + (grad_id + 10000) * 10 * 3,
             X: fid * 25 * 3,
             ORD: ord,
             GR_BL: bl,
@@ -99,11 +102,9 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
             GR_TR: tr,
             GR_ID: grad_id,
             COLOR: col,
-            COLOR_2: col,
+            COLOR_2: col2,
             PREVIEW_OPACITY: 1,
-            HVS_ENABLED: true,
             COLOR_2_HVS_ENABLED: true,
-            HVS: hsv,
             COLOR_2_HVS: hsv,
             GR_VERTEX_MODE: true,
             GR_LAYER: layer
@@ -112,8 +113,8 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
         ord++;
         grad_id++;
     };
-    const tri = (v1, v2, v3, col = 1, bgr = 1, layer) => {
-        quad(v1, v2, v3, v3, col, bgr, layer);
+    const tri = (v1, v2, v3, col = 1, bgr = 1, layer, col2 = col, addBlend = false) => {
+        quad(v1, v2, v3, v3, col, bgr, layer, col2, addBlend);
     };
     const vertexToLight = normalize({
         x: -0.5,
@@ -133,32 +134,37 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
         vertexToGid[i + 1] = vertex(centerPos.x + v.x * 100, centerPos.y + v.y * 100);
     }
 
+    let verticesLight = {};
+    for (let i = 0; i < $obj.vertexNormals.length; i++) {
+        const normal = $obj.vertexNormals[i];
+        if (!normal) continue;
+
+        verticesLight[i] = calcBgrForNormal(normal);
+    }
+
     let asf = [];
     for (let f of $obj.faces) {
         const face_color = f.material == '' ? default_color : colors_u[f.material];
         const vs = f.vertices;
-        const n1 = $obj.vertexNormals[vs[0].vertexNormalIndex - 1];
-        const n2 = $obj.vertexNormals[vs[1].vertexNormalIndex - 1];
-        const n3 = $obj.vertexNormals[vs[2].vertexNormalIndex - 1];
-        const bgr = calcBgrForNormal(normalize({
-            x: avr(n1?.x, n2?.x, n3?.x),
-            y: avr(n1?.y, n2?.y, n3?.y),
-            z: avr(n1?.z, n2?.z, n3?.z)
-        }));
-        let arga;
-        let depth;
-        if (vs.length == 4) {
-            depth = avr($obj.vertices[vs[0].vertexIndex - 1].z, $obj.vertices[vs[1].vertexIndex - 1].z, $obj.vertices[vs[2].vertexIndex - 1].z, $obj.vertices[vs[3].vertexIndex - 1].z);
-            arga = [vertexToGid[vs[3].vertexIndex], vertexToGid[vs[0].vertexIndex], vertexToGid[vs[2].vertexIndex], vertexToGid[vs[1].vertexIndex], face_color, bgr, depth];
-        } else {
-            arga = [vertexToGid[vs[0].vertexIndex], vertexToGid[vs[1].vertexIndex], vertexToGid[vs[2].vertexIndex]];
-            depth = avr($obj.vertices[vs[0].vertexIndex - 1].z, $obj.vertices[vs[1].vertexIndex - 1].z, $obj.vertices[vs[2].vertexIndex - 1].z);
-            arga.push(face_color, bgr, depth);
-        }
-        asf.push(arga);
+
+        const l1 = verticesLight[vs[0].vertexNormalIndex - 1];
+        const l2 = verticesLight[vs[1].vertexNormalIndex - 1];
+        const l3 = verticesLight[vs[2].vertexNormalIndex - 1];
+        
+        const v1 = vertexToGid[vs[0].vertexIndex];
+        const v2 = vertexToGid[vs[1].vertexIndex];
+        const v3 = vertexToGid[vs[2].vertexIndex];
+
+        // There can be faces with 5 or more vertices. It's better to triangulate the meshes through blender instead.
+
+        let depth = avr($obj.vertices[vs[0].vertexIndex - 1].z, $obj.vertices[vs[1].vertexIndex - 1].z, $obj.vertices[vs[2].vertexIndex - 1].z);
+
+        asf.push({vs: [v3, v1, v2], depth, c1: black_color, c2: face_color, bgr: l1, blending: false});
+        asf.push({vs: [v1, v2, v3], depth, c1: black_color, c2: face_color, bgr: l2, blending: true});
+        asf.push({vs: [v2, v3, v1], depth, c1: black_color, c2: face_color, bgr: l3, blending: true});
     }
 
-    asf = asf.sort((a, b) => a[a.length - 1] - b[b.length - 1]).map(x => x.slice(0, -1));
+    asf = asf.sort((a, b) => a.depth - b.depth);
 
     let lrs = 8;
     let lre = 11;
@@ -166,7 +172,7 @@ let obj_to_grad = (material, str, offset_x = 0, offset_y = 0, add = true, old_po
     let layer = lrs;
     for (let a of asf) {
         for (let f of a) {
-            f.length == 6 ? quad(...f, layer) : tri(...f, layer);
+            /*f.length == 6 ? quad(...f, layer) :*/ tri(f.vs[0], f.vs[1], f.vs[2], f.c1, f.bgr, layer, f.c2, f.blending);
         }
         layer++;
     }

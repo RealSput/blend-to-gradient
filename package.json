@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@g-js-api/g.js": "^2.2.1",
+    "mtl-file-parser": "^0.3.0",
+    "obj-file-parser": "^0.6.2"
+  }
+}
