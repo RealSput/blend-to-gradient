@@ -4,9 +4,7 @@ import os
 import pyperclip
 
 # Set the path to store temporary OBJ and MTL files
-temp_objs_path = "./frames"
-
-bpy.ops.wm.open_mainfile(filepath="./test.blend")
+temp_objs_path = ""
 
 if not os.path.exists(temp_objs_path): os.makedirs(temp_objs_path)
 
@@ -41,4 +39,4 @@ mtl_res = read_delete(os.path.join(temp_objs_path, f"frame_{frame_number}.mtl"))
 final_res.append(mtl_res)
 final_res.append(obj_list)
 
-pyperclip.copy(json.dumps(final_res))
+pyperclip.copy(json.dumps(final_res)) 
