@@ -9,4 +9,3 @@ New renderer for converting Blender scenes to GD (based on [@IliasHDZ](https://g
 
 # TODO
 - Optimize as much as possible
-- Add better lighting (possible support for lights inside scenes?)
