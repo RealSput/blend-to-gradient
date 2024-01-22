@@ -28,8 +28,8 @@ def dupframe():
     bpy.context.view_layer.objects.active = duplicated_meshes[0] 
     bpy.ops.object.join()   
 
-temp_objs_path = "P:/tempobjs"
-output_file = "P:/blender-to-gradients/cell_frac_cube.json"
+temp_objs_path = "" # insert path to temp objs folder
+output_file = "" # insert path to output JSON file
 
 if not os.path.exists(temp_objs_path): os.makedirs(temp_objs_path)
 
